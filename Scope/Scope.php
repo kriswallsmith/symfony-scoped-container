@@ -2,7 +2,7 @@
 
 namespace Symfony\Component\DependencyInjection\Scope;
 
-use Symfony\Component\DependencyInjection\FactoryInterface;
+use Symfony\Component\DependencyInjection\Factory\FactoryInterface;
 
 /**
  * The base scope simply wraps an object factory.
