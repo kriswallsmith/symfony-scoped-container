@@ -7,13 +7,18 @@ namespace Symfony\Component\DependencyInjection\Scope;
  */
 class ContainerScope extends Scope
 {
-    protected $services;
+    /**
+     * @var array Service instances indexed by id
+     */
+    private $services = array();
 
+    /** {@inheritDoc} */
     public function has($id)
     {
         return isset($this->services[$id]) || parent::has($id);
     }
 
+    /** {@inheritDoc} */
     public function get($id)
     {
         if (isset($this->services[$id])) {
@@ -23,13 +28,15 @@ class ContainerScope extends Scope
         return $this->services[$id] = parent::get($id);
     }
 
+    /** {@inheritDoc} */
     public function set($id, $service)
     {
         $this->services[$id] = $service;
     }
 
-    public function remove($id)
+    /** {@inheritDoc} */
+    public function getServiceIds()
     {
-        unset($this->services[$id]);
+        return array_unique(array_merge(array_keys($this->services), parent::getServiceIds()));
     }
 }

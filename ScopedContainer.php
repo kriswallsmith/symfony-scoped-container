@@ -7,97 +7,112 @@ use Symfony\Component\DependencyInjection\Scope\ScopeInterface;
 class ScopedContainer implements ScopedContainerInterface
 {
     /**
-     * @var array Scopes indexed by name
+     * @var array An array of {@link ScopeInterface} instances indexed by name
      */
     private $scopes = array();
 
     /**
-     * @var array A map of scope names to levels
+     * @var array A map of scope names to their assigned level
      */
     private $levels = array();
 
     /**
+     * @var array A map of service ids to scope names
+     */
+    private $serviceMap = array();
+
+    /**
+     * @var string The name of the current scope
+     */
+    private $currentScope;
+
+    /**
      * Registers a scope to the container.
      *
-     * @param string         $name  The scope name
-     * @param ScopeInterface $scope The scope
-     * @param integer        $level The scope level
-     */
-    public function registerScope($name, ScopeInterface $scope, $level = 0)
-    {
-        $this->scopes[$name] = $scope;
-        $this->levels[$name] = $level;
-        array_multisort($this->levels, SORT_ASC, $this->scopes);
-    }
-
-    /**
-     * Enters a scope.
+     * The scope should be "fully baked" when registered since service ids
+     * are mapped at this time.
      *
-     * @param string $name The scope name
+     * @param string         $scopeName The scope name
+     * @param ScopeInterface $scope     The scope
+     * @param integer        $level     The scope level
      */
-    public function enterScope($name)
+    public function registerScope($scopeName, ScopeInterface $scope, $level = 0)
     {
-        if (!isset($this->scopes[$name])) {
-            throw new \InvalidArgumentException(sprintf('There is no "%s" scope.', $name));
+        $this->scopes[$scopeName] = $scope;
+        $this->levels[$scopeName] = $level;
+
+        foreach ($scope->getServiceIds() as $id) {
+            $this->serviceMap[$id] = $scopeName;
         }
 
-        $this->scopes[$name]->enter();
+        $scope->setContainer($this);
     }
 
-    /**
-     * Leaves a scope.
-     *
-     * @param string $name The scope name
-     */
-    public function leaveScope($name)
+    /** {@inheritDoc} */
+    public function enterScope($scopeName)
     {
-        if (!isset($this->scopes[$name])) {
-            throw new \InvalidArgumentException(sprintf('There is no "%s" scope.', $name));
+        if (!isset($this->scopes[$scopeName])) {
+            throw new \InvalidArgumentException(sprintf('There is no "%s" scope.', $scopeName));
         }
 
-        $this->scopes[$name]->leave();
+        $this->scopes[$scopeName]->enter();
     }
 
-    /**
-     * Checks for a service by id.
-     */
+    /** {@inheritDoc} */
+    public function leaveScope($scopeName)
+    {
+        if (!isset($this->scopes[$scopeName])) {
+            throw new \InvalidArgumentException(sprintf('There is no "%s" scope.', $scopeName));
+        }
+
+        $this->scopes[$scopeName]->leave();
+    }
+
+    /** {@inheritDoc} */
     public function has($id)
     {
-        foreach ($this->scopes as $name => $scope) {
-            if ($scope->has($id)) {
-                return true;
-            }
-        }
-
-        return false;
+        return isset($this->serviceMap[$id]);
     }
 
-    /**
-     * Retrieves a service by name.
-     */
+    /** {@inheritDoc} */
     public function get($id)
     {
-        foreach ($this->scopes as $name => $scope) {
-            if ($scope->has($id)) {
-                return $scope->get($id);
+        if (isset($this->serviceMap[$id])) {
+            $scopeName = $this->serviceMap[$id];
+
+            if (null === $this->currentScope) {
+                $this->currentScope = $scopeName;
+            } elseif ($this->levels[$scopeName] > $this->levels[$this->currentScope]) {
+                throw new \LogicException(sprintf('Services in the "%s" scope (i.e. "%s") are not available to services in the "%s" scope.', $scopeName, $id, $this->currentScope));
             }
+
+            // fetch service
+            $instance = $this->scopes[$scopeName]->get($id);
+
+            // reset level
+            $this->currentScope = null;
+
+            return $instance;
         }
     }
 
-    /**
-     * Sets a service by name.
-     */
-    public function set($id, $service, $scope = null)
+    /** {@inheritDoc} */
+    public function set($id, $service, $scopeName = null)
     {
-        if (null === $scope) {
-            reset($this->scopes);
-            $scope = key($this->scopes);
+        // defaults to the first scope
+        if (null === $scopeName) {
+            $scopeName = key($this->scopes);
+        } elseif (!isset($this->scopes[$scopeName])) {
+            throw new \InvalidArgumentException(sprintf('There is no "%s" scope.', $scopeName));
         }
 
-        if (!isset($this->scopes[$scope])) {
-            throw new \InvalidArgumentException(sprintf('There is no "%s" scope.', $scope));
-        }
+        $this->scopes[$scopeName]->set($id, $service);
+        $this->serviceMap[$id] = $scopeName;
+    }
 
-        $this->scopes[$scope]->set($id, $service);
+    /** {@inheritDoc} */
+    public function getServiceIds()
+    {
+        return array_keys($this->serviceMap);
     }
 }
