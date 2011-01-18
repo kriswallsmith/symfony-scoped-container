@@ -5,6 +5,7 @@ namespace Symfony\Component\DependencyInjection;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\DependencyInjection\ParameterBag\FrozenParameterBag;
+use Symfony\Component\DependencyInjection\Scope\ContainerScope;
 use Symfony\Component\DependencyInjection\Scope\ScopeInterface;
 
 class ScopedContainer implements ScopedContainerInterface
