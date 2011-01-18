@@ -9,6 +9,10 @@ use Symfony\Component\DependencyInjection\Factory\FactoryInterface;
  */
 interface ContainerInterface
 {
+    const EXCEPTION_ON_INVALID_REFERENCE = 1;
+    const NULL_ON_INVALID_REFERENCE      = 2;
+    const IGNORE_ON_INVALID_REFERENCE    = 3;
+
     /**
      * Checks if the factory knows how to create a service.
      *
@@ -21,11 +25,12 @@ interface ContainerInterface
     /**
      * Gets an instance of a service.
      *
-     * @param string $id The service id
+     * @param string  $id              The service id
+     * @param integer $invalidBehavior The behavior when the service does not exist
      *
      * @return object A new object instance
      */
-    function get($id);
+    function get($id, $invalidBehavior = self::EXCEPTION_ON_INVALID_REFERENCE);
 
     /**
      * Sets a service on the current container.

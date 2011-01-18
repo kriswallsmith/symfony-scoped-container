@@ -19,13 +19,13 @@ class ContainerScope extends Scope
     }
 
     /** {@inheritDoc} */
-    public function get($id)
+    public function get($id, $invalidBehavior = ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE)
     {
         if (isset($this->services[$id])) {
             return $this->services[$id];
         }
 
-        return $this->services[$id] = parent::get($id);
+        return $this->services[$id] = parent::get($id, $invalidBehavior);
     }
 
     /** {@inheritDoc} */

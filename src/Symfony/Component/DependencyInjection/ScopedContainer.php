@@ -79,7 +79,7 @@ class ScopedContainer implements ScopedContainerInterface
     }
 
     /** {@inheritDoc} */
-    public function get($id)
+    public function get($id, $invalidBehavior = ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE)
     {
         if (isset($this->serviceMap[$id])) {
             $scopeName = $this->serviceMap[$id];
@@ -98,6 +98,8 @@ class ScopedContainer implements ScopedContainerInterface
             $this->currentScope = null;
 
             return $instance;
+        } elseif (ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE == $invalidBehavior) {
+            throw new \InvalidArgumentException(sprintf('The service "%s" does not exist.', $id));
         }
     }
 

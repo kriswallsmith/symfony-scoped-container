@@ -53,9 +53,13 @@ class Scope implements ScopeInterface
     }
 
     /** {@inheritDoc} */
-    public function get($id)
+    public function get($id, $invalidBehavior = ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE)
     {
-        return $this->factory->create($id, $this->container ?: $this);
+        if ($instance = $this->factory->create($id, $this->container ?: $this)) {
+            return $instance;
+        } elseif (ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE == $invalidBehavior) {
+            throw new \InvalidArgumentException(sprintf('The service "%s" does not exist.', $id));
+        }
     }
 
     /** {@inheritDoc} */
