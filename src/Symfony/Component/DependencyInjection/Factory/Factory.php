@@ -33,12 +33,16 @@ class Factory implements FactoryInterface
      */
     public function register($id, $callable)
     {
+        $id = strtolower($id);
+
         $this->callables[$id] = $callable;
     }
 
     /** {@inheritDoc} */
     public function create($id, ContainerInterface $container)
     {
+        $id = strtolower($id);
+
         if (isset($this->callables[$id])) {
             return call_user_func($this->callables[$id], $container);
         }
@@ -47,6 +51,8 @@ class Factory implements FactoryInterface
     /** {@inheritDoc} */
     public function has($id)
     {
+        $id = strtolower($id);
+
         return isset($this->callables[$id]);
     }
 

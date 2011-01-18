@@ -15,12 +15,16 @@ class ContainerScope extends Scope
     /** {@inheritDoc} */
     public function has($id)
     {
+        $id = strtolower($id);
+
         return isset($this->services[$id]) || parent::has($id);
     }
 
     /** {@inheritDoc} */
     public function get($id, $invalidBehavior = ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE)
     {
+        $id = strtolower($id);
+
         if (isset($this->services[$id])) {
             return $this->services[$id];
         }
@@ -31,6 +35,8 @@ class ContainerScope extends Scope
     /** {@inheritDoc} */
     public function set($id, $service)
     {
+        $id = strtolower($id);
+
         $this->services[$id] = $service;
     }
 

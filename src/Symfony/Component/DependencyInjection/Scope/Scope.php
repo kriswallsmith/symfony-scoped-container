@@ -49,12 +49,16 @@ class Scope implements ScopeInterface
     /** {@inheritDoc} */
     public function has($id)
     {
+        $id = strtolower($id);
+
         return $this->factory->has($id);
     }
 
     /** {@inheritDoc} */
     public function get($id, $invalidBehavior = ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE)
     {
+        $id = strtolower($id);
+
         if ($instance = $this->factory->create($id, $this->container ?: $this)) {
             return $instance;
         } elseif (ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE == $invalidBehavior) {

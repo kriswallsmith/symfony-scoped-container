@@ -163,12 +163,16 @@ class ScopedContainer implements ScopedContainerInterface
     /** {@inheritDoc} */
     public function has($id)
     {
+        $id = strtolower($id);
+
         return isset($this->serviceMap[$id]);
     }
 
     /** {@inheritDoc} */
     public function get($id, $invalidBehavior = ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE)
     {
+        $id = strtolower($id);
+
         if (isset($this->serviceMap[$id])) {
             $scopeName = $this->serviceMap[$id];
 
@@ -194,6 +198,8 @@ class ScopedContainer implements ScopedContainerInterface
     /** {@inheritDoc} */
     public function set($id, $service, $scopeName = null)
     {
+        $id = strtolower($id);
+
         if (null === $scopeName) {
             // use the mapped scope or default to the first scope
             $scopeName = isset($this->serviceMap[$id]) ? $this->serviceMap[$id] : key($this->levels);

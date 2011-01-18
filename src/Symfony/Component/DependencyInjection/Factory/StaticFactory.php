@@ -23,7 +23,9 @@ class StaticFactory implements FactoryInterface
     /** {@inheritDoc} */
     public function has($id)
     {
-        return in_array($id, static::$serviceIds);
+        $id = strtolower($id);
+
+        return in_array($id, static::getServiceIds());
     }
 
     /** {@inheritDoc} */
