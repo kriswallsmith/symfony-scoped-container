@@ -17,13 +17,11 @@ You can create a scoped container in plain PHP:
 
     class Container extends DI\ScopedContainer
     {
-        public function __construct($parameterBag = null)
+        protected function registerScopes()
         {
             $this->registerScope('container', new DI\Scope\ContainerScope(new ContainerFactory()));
             $this->registerScope('prototype', new DI\Scope\PrototypeScope(new PrototypeFactory()));
             $this->registerScope('request',   new DI\Scope\NestingContainerScope(new RequestFactory()), 1);
-
-            parent::__construct($parameterBag);
         }
     }
 
