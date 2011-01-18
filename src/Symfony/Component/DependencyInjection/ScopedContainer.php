@@ -2,10 +2,16 @@
 
 namespace Symfony\Component\DependencyInjection;
 
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
+use Symfony\Component\DependencyInjection\ParameterBag\FrozenParameterBag;
 use Symfony\Component\DependencyInjection\Scope\ScopeInterface;
 
 class ScopedContainer implements ScopedContainerInterface
 {
+    protected $parameterBag;
+    protected $loading = array();
+
     /**
      * @var array An array of {@link ScopeInterface} instances indexed by name
      */
@@ -25,6 +31,88 @@ class ScopedContainer implements ScopedContainerInterface
      * @var string The name of the current scope
      */
     protected $currentScope;
+
+    /**
+     * Constructor.
+     *
+     * @param ParameterBagInterface $parameterBag A ParameterBagInterface instance
+     */
+    public function __construct(ParameterBagInterface $parameterBag = null)
+    {
+        $this->parameterBag = $parameterBag ?: new ParameterBag();
+    }
+
+    /**
+     * Compiles the container.
+     *
+     * This method does two things:
+     *
+     *  * Parameter values are resolved;
+     *  * The parameter bag is frozen.
+     */
+    public function compile()
+    {
+        $this->parameterBag->resolve();
+
+        $this->parameterBag = new FrozenParameterBag($this->parameterBag->all());
+    }
+
+    /**
+     * Returns true if the container parameter bag are frozen.
+     *
+     * @return Boolean true if the container parameter bag are frozen, false otherwise
+     */
+    public function isFrozen()
+    {
+        return $this->parameterBag instanceof FrozenParameterBag;
+    }
+
+    /**
+     * Gets the service container parameter bag.
+     *
+     * @return ParameterBagInterface A ParameterBagInterface instance
+     */
+    public function getParameterBag()
+    {
+        return $this->parameterBag;
+    }
+
+    /**
+     * Gets a parameter.
+     *
+     * @param  string $name The parameter name
+     *
+     * @return mixed  The parameter value
+     *
+     * @throws  \InvalidArgumentException if the parameter is not defined
+     */
+    public function getParameter($name)
+    {
+        return $this->parameterBag->get($name);
+    }
+
+    /**
+     * Checks if a parameter exists.
+     *
+     * @param  string $name The parameter name
+     *
+     * @return boolean The presence of parameter in container
+     */
+    public function hasParameter($name)
+    {
+        return $this->parameterBag->has($name);
+    }
+
+    /**
+     * Sets a parameter.
+     *
+     * @param string $name       The parameter name
+     * @param mixed  $parameters The parameter value
+     */
+    public function setParameter($name, $value)
+    {
+        $this->parameterBag->set($name, $value);
+    }
 
     /**
      * Registers a scope to the container.
