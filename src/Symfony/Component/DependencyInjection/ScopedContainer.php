@@ -136,12 +136,12 @@ class ScopedContainer implements ScopedContainerInterface
     private function buildServiceMap()
     {
         $serviceMap = array();
-        foreach (array_keys($this->levels) as $scopeName) {
-            $serviceIds = $this->scopes[$scopeName]->getServiceIds();
-            $serviceMap += array_combine(
-                $serviceIds,
-                array_fill(0, count($serviceIds), $scopeName)
-            );
+        foreach ($this->levels as $scopeName => $level) {
+            foreach ($this->scopes[$scopeName]->getServiceIds() as $id) {
+                if (!isset($serviceMap[$id])) {
+                    $serviceMap[$id] = $scopeName;
+                }
+            }
         }
 
         return $serviceMap;
