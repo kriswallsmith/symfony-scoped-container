@@ -10,22 +10,22 @@ use Symfony\Component\DependencyInjection\Scope\ScopeInterface;
 class ScopedContainer implements ScopedContainerInterface
 {
     protected $parameterBag;
-    protected $loading = array();
+    protected $loading;
 
     /**
      * @var array An array of {@link ScopeInterface} instances indexed by name
      */
-    protected $scopes = array();
+    protected $scopes;
 
     /**
      * @var array A map of scope names to their assigned level
      */
-    protected $levels = array();
+    protected $levels;
 
     /**
      * @var array A map of service ids to scope names
      */
-    protected $serviceMap = array();
+    protected $serviceMap;
 
     /**
      * @var string The name of the current scope
@@ -40,6 +40,11 @@ class ScopedContainer implements ScopedContainerInterface
     public function __construct(ParameterBagInterface $parameterBag = null)
     {
         $this->parameterBag = $parameterBag ?: new ParameterBag();
+
+        $this->loading    = array();
+        $this->scopes     = array();
+        $this->levels     = array();
+        $this->serviceMap = array();
     }
 
     /**

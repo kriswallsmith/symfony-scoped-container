@@ -2,6 +2,8 @@
 
 namespace Symfony\Component\DependencyInjection\Scope;
 
+use Symfony\Component\DependencyInjection\Factory\FactoryInterface;
+
 /**
  * Nests many container scopes in one upon enter and leave.
  */
@@ -10,7 +12,14 @@ class NestingContainerScope extends ContainerScope
     /**
      * @var array A LIFO queue of nested scopes
      */
-    protected $scopes = array();
+    protected $scopes;
+
+    public function __construct(FactoryInterface $factory)
+    {
+        $this->scopes = array();
+
+        parent::__construct($factory);
+    }
 
     public function enter()
     {
