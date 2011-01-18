@@ -14,7 +14,7 @@ class ContainerScope extends PrototypeScope
      */
     protected $services;
 
-    public function __construct(FactoryInterface $factory)
+    public function __construct(FactoryInterface $factory = null)
     {
         $this->services = array();
 

@@ -25,7 +25,7 @@ class PrototypeScope implements ScopeInterface
      *
      * @param FactoryInterface $factory A factory for the current scope's services
      */
-    public function __construct(FactoryInterface $factory)
+    public function __construct(FactoryInterface $factory = null)
     {
         $this->factory = $factory;
     }

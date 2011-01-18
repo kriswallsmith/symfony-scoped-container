@@ -14,7 +14,7 @@ class NestingContainerScope extends ContainerScope
      */
     protected $scopes;
 
-    public function __construct(FactoryInterface $factory)
+    public function __construct(FactoryInterface $factory = null)
     {
         $this->scopes = array();
 
