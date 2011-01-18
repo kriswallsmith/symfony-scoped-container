@@ -190,7 +190,12 @@ class Container implements ScopedContainerInterface
     {
         $id = strtolower($id);
 
+        if (isset($this->loading[$id])) {
+            throw new \LogicException(sprintf('Circular reference detected for service "%s" (services currently loading: %s).', $id, implode(', ', array_keys($this->loading))));
+        }
+
         if (isset($this->serviceMap[$id])) {
+            $this->loading[$id] = true;
             $scopeName = $this->serviceMap[$id];
 
             if (null === $this->currentScope) {
@@ -203,8 +208,9 @@ class Container implements ScopedContainerInterface
             // fetch service
             $instance = $this->scopes[$scopeName]->get($id);
 
-            // reset level
+            // reset level and loading
             $this->currentScope = null;
+            unset($this->loading[$id]);
 
             return $instance;
         } elseif (ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE == $invalidBehavior) {
