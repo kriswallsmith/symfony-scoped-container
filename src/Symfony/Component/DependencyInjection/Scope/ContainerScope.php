@@ -5,7 +5,7 @@ namespace Symfony\Component\DependencyInjection\Scope;
 /**
  * The container scope always returns the same instance of a service.
  */
-class ContainerScope extends Scope
+class ContainerScope extends PrototypeScope
 {
     /**
      * @var array Service instances indexed by id

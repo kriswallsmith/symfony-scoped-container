@@ -8,7 +8,7 @@ use Symfony\Component\DependencyInjection\Factory\FactoryInterface;
 /**
  * The base scope simply wraps an object factory.
  */
-class Scope implements ScopeInterface
+class PrototypeScope implements ScopeInterface
 {
     /**
      * @var FactoryInterface A factory for creating new instances
