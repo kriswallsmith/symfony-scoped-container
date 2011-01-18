@@ -10,7 +10,7 @@ class NestingContainerScope extends ContainerScope
     /**
      * @var array A FIFO queue of nested scopes
      */
-    private $scopes = array();
+    protected $scopes = array();
 
     public function enter()
     {

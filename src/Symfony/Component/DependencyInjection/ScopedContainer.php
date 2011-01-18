@@ -9,22 +9,22 @@ class ScopedContainer implements ScopedContainerInterface
     /**
      * @var array An array of {@link ScopeInterface} instances indexed by name
      */
-    private $scopes = array();
+    protected $scopes = array();
 
     /**
      * @var array A map of scope names to their assigned level
      */
-    private $levels = array();
+    protected $levels = array();
 
     /**
      * @var array A map of service ids to scope names
      */
-    private $serviceMap = array();
+    protected $serviceMap = array();
 
     /**
      * @var string The name of the current scope
      */
-    private $currentScope;
+    protected $currentScope;
 
     /**
      * Registers a scope to the container.
@@ -135,7 +135,7 @@ class ScopedContainer implements ScopedContainerInterface
      *
      * @return array A map of service ids to scope names
      */
-    private function buildServiceMap()
+    protected function buildServiceMap()
     {
         $serviceMap = array();
         foreach ($this->levels as $scopeName => $level) {

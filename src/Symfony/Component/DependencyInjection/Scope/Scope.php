@@ -13,12 +13,12 @@ class Scope implements ScopeInterface
     /**
      * @var FactoryInterface A factory for creating new instances
      */
-    private $factory;
+    protected $factory;
 
     /**
      * @var ContainerInterface A container for fetching dependencies
      */
-    private $container;
+    protected $container;
 
     /**
      * Constructor.

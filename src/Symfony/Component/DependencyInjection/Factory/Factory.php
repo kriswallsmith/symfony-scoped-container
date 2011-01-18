@@ -12,7 +12,7 @@ class Factory implements FactoryInterface
     /**
      * @var array An array of callables for creating services
      */
-    private $callables = array();
+    protected $callables = array();
 
     /**
      * Registers a callable to the factory.
