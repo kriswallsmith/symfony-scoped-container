@@ -46,14 +46,14 @@ class ScopedContainer implements ScopedContainerInterface
         $this->levels     = array();
         $this->serviceMap = array();
 
-        $this->registerScopes();
+        $this->setupScopes();
         $this->set('service_container', $this);
     }
 
     /**
      * Registers scopes for the current container.
      */
-    protected function registerScopes()
+    protected function setupScopes()
     {
         $this->registerScope('container', new ContainerScope());
     }
