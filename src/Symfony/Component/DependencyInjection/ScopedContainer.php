@@ -105,8 +105,8 @@ class ScopedContainer implements ScopedContainerInterface
     public function set($id, $service, $scopeName = null)
     {
         if (null === $scopeName) {
-            // default to the first scope
-            $scopeName = current($this->levels);
+            // use the mapped scope or default to the first scope
+            $scopeName = isset($this->serviceMap[$id]) ? $this->serviceMap[$id] : key($this->levels);
         } elseif (isset($this->serviceMap[$id]) && $this->serviceMap[$id] != $scopeName) {
             // ScopeMismatchException
             throw new \LogicException(sprintf('There is already a "%s" service set on the "%s" scope.', $id, $this->serviceMap[$id]));
