@@ -8,7 +8,7 @@ use Symfony\Component\DependencyInjection\ParameterBag\FrozenParameterBag;
 use Symfony\Component\DependencyInjection\Scope\ContainerScope;
 use Symfony\Component\DependencyInjection\Scope\ScopeInterface;
 
-class ScopedContainer implements ScopedContainerInterface
+class Container implements ScopedContainerInterface
 {
     protected $parameterBag;
     protected $loading;

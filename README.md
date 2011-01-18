@@ -15,7 +15,7 @@ You can create a scoped container in plain PHP:
 
     use Symfony\Component\DependencyInjection as DI;
 
-    class Container extends DI\ScopedContainer
+    class Container extends DI\Container
     {
         protected function registerScopes()
         {
