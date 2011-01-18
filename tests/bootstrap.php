@@ -1,6 +1,6 @@
 <?php
 
-spl_autoload_register(function($class)
+function __autoload($class)
 {
     if (0 === strpos($class, 'Symfony\\Component\\DependencyInjection\\')) {
         $file = __DIR__ . '/../src/' . str_replace('\\', '/', $class) . '.php';
@@ -9,4 +9,4 @@ spl_autoload_register(function($class)
             return true;
         }
     }
-});
+}
