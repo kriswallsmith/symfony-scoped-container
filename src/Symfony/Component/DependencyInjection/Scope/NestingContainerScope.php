@@ -8,7 +8,7 @@ namespace Symfony\Component\DependencyInjection\Scope;
 class NestingContainerScope extends ContainerScope
 {
     /**
-     * @var array A FIFO queue of nested scopes
+     * @var array A LIFO queue of nested scopes
      */
     protected $scopes = array();
 
