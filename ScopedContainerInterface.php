@@ -9,7 +9,25 @@ use Symfony\Component\DependencyInjection\Scope\ScopeInterface;
  */
 interface ScopedContainerInterface extends ContainerInterface
 {
+    /**
+     * Registers a scope to the current container.
+     *
+     * @param string         $scopeName The scope name
+     * @param ScopeInterface $scope     The scope
+     */
     function registerScope($scopeName, ScopeInterface $scope)
+
+    /**
+     * Enters a scope.
+     *
+     * @param string $scopeName The scope name
+     */
     function enterScope($scopeName);
+
+    /**
+     * Leaves a scope.
+     *
+     * @param string $scopeName The scope name
+     */
     function leaveScope($scopeName);
 }

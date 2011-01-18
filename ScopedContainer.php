@@ -38,14 +38,18 @@ class ScopedContainer implements ScopedContainerInterface
      */
     public function registerScope($scopeName, ScopeInterface $scope, $level = 0)
     {
-        $this->scopes[$scopeName] = $scope;
-        $this->levels[$scopeName] = $level;
-
-        foreach ($scope->getServiceIds() as $id) {
-            $this->serviceMap[$id] = $scopeName;
+        if (isset($this->scopes[$scopeName])) {
+            // DuplicateScopeException
+            throw new \LogicException(sprintf('There is already a "%s" scope registered.', $scopeName));
         }
 
         $scope->setContainer($this);
+
+        $this->scopes[$scopeName] = $scope;
+        $this->levels[$scopeName] = $level;
+        asort($this->levels);
+
+        $this->buildServiceMap();
     }
 
     /** {@inheritDoc} */
@@ -83,6 +87,7 @@ class ScopedContainer implements ScopedContainerInterface
             if (null === $this->currentScope) {
                 $this->currentScope = $scopeName;
             } elseif ($this->levels[$scopeName] > $this->levels[$this->currentScope]) {
+                // InaccessibleScopeException
                 throw new \LogicException(sprintf('Services in the "%s" scope (i.e. "%s") are not available to services in the "%s" scope.', $scopeName, $id, $this->currentScope));
             }
 
@@ -99,10 +104,14 @@ class ScopedContainer implements ScopedContainerInterface
     /** {@inheritDoc} */
     public function set($id, $service, $scopeName = null)
     {
-        // defaults to the first scope
         if (null === $scopeName) {
-            $scopeName = key($this->scopes);
+            // default to the first scope
+            $scopeName = current($this->levels);
+        } elseif (isset($this->serviceMap[$id]) && $this->serviceMap[$id] != $scopeName) {
+            // ScopeMismatchException
+            throw new \LogicException(sprintf('There is already a "%s" service set on the "%s" scope.', $id, $this->serviceMap[$id]));
         } elseif (!isset($this->scopes[$scopeName])) {
+            // InvalidScopeException
             throw new \InvalidArgumentException(sprintf('There is no "%s" scope.', $scopeName));
         }
 
@@ -114,5 +123,25 @@ class ScopedContainer implements ScopedContainerInterface
     public function getServiceIds()
     {
         return array_keys($this->serviceMap);
+    }
+
+    /**
+     * Resets the service map.
+     *
+     * Scopes from lower levels will take precedence over duplicate ids from
+     * higher level scopes.
+     */
+    private function buildServiceMap()
+    {
+        $serviceMap = array();
+        foreach (array_keys($this->levels) as $scopeName) {
+            $serviceIds = $this->scopes[$scopeName]->getServiceIds();
+            $serviceMap += array_combine(
+                $serviceIds,
+                array_fill(0, count($serviceIds), $scopeName)
+            );
+        }
+
+        $this->serviceMap = $serviceMap;
     }
 }
