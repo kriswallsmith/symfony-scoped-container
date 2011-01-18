@@ -15,7 +15,7 @@ interface ScopedContainerInterface extends ContainerInterface
      * @param string         $scopeName The scope name
      * @param ScopeInterface $scope     The scope
      */
-    function registerScope($scopeName, ScopeInterface $scope)
+    function registerScope($scopeName, ScopeInterface $scope);
 
     /**
      * Enters a scope.
