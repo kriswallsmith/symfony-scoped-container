@@ -20,6 +20,11 @@ class Scope implements ScopeInterface
      */
     private $container;
 
+    /**
+     * Constructor.
+     *
+     * @param FactoryInterface $factory A factory for the current scope's services
+     */
     public function __construct(FactoryInterface $factory)
     {
         $this->factory = $factory;

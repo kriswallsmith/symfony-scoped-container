@@ -7,7 +7,10 @@ namespace Symfony\Component\DependencyInjection\Scope;
  */
 class NestingContainerScope extends ContainerScope
 {
-    protected $scopes = array();
+    /**
+     * @var array A FIFO queue of nested scopes
+     */
+    private $scopes = array();
 
     public function enter()
     {

@@ -10,7 +10,7 @@ class ContainerScope extends Scope
     /**
      * @var array Service instances indexed by id
      */
-    private $services = array();
+    protected $services = array();
 
     /** {@inheritDoc} */
     public function has($id)
