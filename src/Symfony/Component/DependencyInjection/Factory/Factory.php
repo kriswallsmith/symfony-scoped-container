@@ -14,7 +14,23 @@ class Factory implements FactoryInterface
      */
     private $callables = array();
 
-    /** {@inheritDoc} */
+    /**
+     * Registers a callable to the factory.
+     *
+     * The callable should accept a {@link ContainerInterface} as its only
+     * argument. The container should be used to retrieve other service the
+     * current one relies on.
+     *
+     *     $factory->register('db', function(ContainerInterface $container)
+     *     {
+     *         $db = new Connection();
+     *         $db->setLogger($container->get('logger'));
+     *         return $db;
+     *     });
+     *
+     * @param string $id       The service id
+     * @param mixed  $callable A PHP callable that will create the service
+     */
     public function register($id, $callable)
     {
         $this->callables[$id] = $callable;
