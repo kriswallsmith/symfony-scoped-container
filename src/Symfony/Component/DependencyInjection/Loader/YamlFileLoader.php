@@ -147,8 +147,8 @@ class YamlFileLoader extends FileLoader
             $definition->setClass($service['class']);
         }
 
-        if (isset($service['shared'])) {
-            $definition->setShared($service['shared']);
+        if (isset($service['scope'])) {
+            $definition->setScope($service['scope']);
         }
 
         if (isset($service['public'])) {
