@@ -154,7 +154,7 @@ class Container implements ScopedContainerInterface
         $this->levels[$scopeName] = $level;
         asort($this->levels);
 
-        $this->serviceMap = $this->buildServiceMap();
+        $this->buildServiceMap();
     }
 
     /** {@inheritDoc} */
@@ -245,12 +245,10 @@ class Container implements ScopedContainerInterface
     }
 
     /**
-     * Resets the service map.
+     * Builds the map of service id to scope name.
      *
      * Scopes from lower levels will take precedence over duplicate ids from
      * higher level scopes.
-     *
-     * @return array A map of service ids to scope names
      */
     protected function buildServiceMap()
     {
@@ -263,6 +261,6 @@ class Container implements ScopedContainerInterface
             }
         }
 
-        return $serviceMap;
+        $this->serviceMap = $serviceMap;
     }
 }
