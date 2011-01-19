@@ -1,0 +1,1545 @@
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/Compiler/InlineServiceDefinitionsPass.php src/Symfony/Component/DependencyInjection/Compiler/InlineServiceDefinitionsPass.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/Compiler/InlineServiceDefinitionsPass.php	2011-01-18 07:02:01.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/Compiler/InlineServiceDefinitionsPass.php	2011-01-18 11:05:47.000000000 -0800
+@@ -56,11 +56,7 @@
+                 }
+ 
+                 if ($this->isInlinableDefinition($container, $id, $definition = $container->getDefinition($id))) {
+-                    if ($definition->isShared()) {
+-                        $arguments[$k] = $definition;
+-                    } else {
+-                        $arguments[$k] = clone $definition;
+-                    }
++                    $arguments[$k] = $definition;
+                 }
+             } else if ($argument instanceof Definition) {
+                 $argument->setArguments($this->inlineArguments($container, $argument->getArguments()));
+@@ -73,10 +69,6 @@
+ 
+     protected function isInlinableDefinition(ContainerBuilder $container, $id, Definition $definition)
+     {
+-        if (!$definition->isShared()) {
+-            return true;
+-        }
+-
+         if ($definition->isPublic()) {
+             return false;
+         }
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/Compiler/RemoveUnusedDefinitionsPass.php src/Symfony/Component/DependencyInjection/Compiler/RemoveUnusedDefinitionsPass.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/Compiler/RemoveUnusedDefinitionsPass.php	2011-01-18 05:01:04.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/Compiler/RemoveUnusedDefinitionsPass.php	2011-01-19 04:53:47.000000000 -0800
+@@ -62,9 +62,9 @@
+             if (1 === count($referencingAliases) && false === $isReferenced) {
+                 $container->setDefinition((string) reset($referencingAliases), $definition);
+                 $definition->setPublic(true);
+-                $container->remove($id);
++                $container->removeDefinition($id);
+             } else if (0 === count($referencingAliases) && false === $isReferenced) {
+-                $container->remove($id);
++                $container->removeDefinition($id);
+                 $hasChanged = true;
+             }
+         }
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/Compiler/ReplaceAliasByActualDefinitionPass.php src/Symfony/Component/DependencyInjection/Compiler/ReplaceAliasByActualDefinitionPass.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/Compiler/ReplaceAliasByActualDefinitionPass.php	2011-01-18 05:01:04.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/Compiler/ReplaceAliasByActualDefinitionPass.php	2011-01-19 04:53:55.000000000 -0800
+@@ -35,7 +35,7 @@
+ 
+             $definition->setPublic(true);
+             $container->setDefinition($id, $definition);
+-            $container->remove($aliasId);
++            $container->removeDefinition($aliasId);
+ 
+             $this->updateReferences($container, $aliasId, $id);
+ 
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/Container.php src/Symfony/Component/DependencyInjection/Container.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/Container.php	2011-01-19 07:44:53.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/Container.php	2011-01-19 07:30:52.000000000 -0800
+@@ -1,62 +1,42 @@
+ <?php
+ 
+-/*
+- * This file is part of the Symfony package.
+- *
+- * (c) Fabien Potencier <fabien.potencier@symfony-project.com>
+- *
+- * For the full copyright and license information, please view the LICENSE
+- * file that was distributed with this source code.
+- */
+-
+ namespace Symfony\Component\DependencyInjection;
+ 
+ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
+ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
+ use Symfony\Component\DependencyInjection\ParameterBag\FrozenParameterBag;
++use Symfony\Component\DependencyInjection\Scope\ContainerScope;
++use Symfony\Component\DependencyInjection\Scope\ScopeInterface;
+ 
+-/**
+- * Container is a dependency injection container.
+- *
+- * It gives access to object instances (services).
+- *
+- * Services and parameters are simple key/pair stores.
+- *
+- * Parameter and service keys are case insensitive.
+- *
+- * A service id can contain lowercased letters, digits, underscores, and dots.
+- * Underscores are used to separate words, and dots to group services
+- * under namespaces:
+- *
+- * <ul>
+- *   <li>request</li>
+- *   <li>mysql_session_storage</li>
+- *   <li>symfony.mysql_session_storage</li>
+- * </ul>
+- *
+- * A service can also be defined by creating a method named
+- * getXXXService(), where XXX is the camelized version of the id:
+- *
+- * <ul>
+- *   <li>request -> getRequestService()</li>
+- *   <li>mysql_session_storage -> getMysqlSessionStorageService()</li>
+- *   <li>symfony.mysql_session_storage -> getSymfony_MysqlSessionStorageService()</li>
+- * </ul>
+- *
+- * The container can have three possible behaviors when a service does not exist:
+- *
+- *  * EXCEPTION_ON_INVALID_REFERENCE: Throws an exception (the default)
+- *  * NULL_ON_INVALID_REFERENCE:      Returns null
+- *  * IGNORE_ON_INVALID_REFERENCE:    Ignores the wrapping command asking for the reference
+- *                                    (for instance, ignore a setter if the service does not exist)
+- *
+- * @author Fabien Potencier <fabien.potencier@symfony-project.com>
+- */
+-class Container implements ContainerInterface
++class Container implements ScopedContainerInterface
+ {
+     protected $parameterBag;
+-    protected $services;
+-    protected $loading = array();
++    protected $loading;
++
++    /**
++     * @var array An array of {@link ScopeInterface} instances indexed by name
++     */
++    protected $scopes;
++
++    /**
++     * @var array A map of scope names to their assigned level
++     */
++    protected $levels;
++
++    /**
++     * @var array A map of service ids to scope names
++     */
++    protected $serviceMap;
++
++    /**
++     * @var string The name of the current scope
++     */
++    protected $currentScope;
++
++    /**
++     * @var string The name of the default scope
++     */
++    protected $defaultScope;
+ 
+     /**
+      * Constructor.
+@@ -65,12 +45,26 @@
+      */
+     public function __construct(ParameterBagInterface $parameterBag = null)
+     {
+-        $this->parameterBag = null === $parameterBag ? new ParameterBag() : $parameterBag;
+-        $this->services = array();
++        $this->parameterBag = $parameterBag ?: new ParameterBag();
++
++        $this->loading    = array();
++        $this->scopes     = array();
++        $this->levels     = array();
++        $this->serviceMap = array();
++
++        $this->setupScopes();
+         $this->set('service_container', $this);
+     }
+ 
+     /**
++     * Registers scopes for the current container.
++     */
++    protected function setupScopes()
++    {
++        $this->registerScope('container', new ContainerScope());
++    }
++
++    /**
+      * Compiles the container.
+      *
+      * This method does two things:
+@@ -143,97 +137,150 @@
+     }
+ 
+     /**
+-     * Sets a service.
++     * Registers a scope to the container.
+      *
+-     * @param string $id      The service identifier
+-     * @param object $service The service instance
++     * The scope should be "fully baked" when registered since service ids
++     * are mapped at this time.
++     *
++     * @param string         $scopeName The scope name
++     * @param ScopeInterface $scope     The scope
++     * @param integer        $level     The scope level
+      */
+-    public function set($id, $service)
++    public function registerScope($scopeName, ScopeInterface $scope, $level = 0)
+     {
+-        $this->services[strtolower($id)] = $service;
++        if (isset($this->scopes[$scopeName])) {
++            // DuplicateScopeException
++            throw new \LogicException(sprintf('There is already a "%s" scope registered.', $scopeName));
++        }
++
++        $scope->setContainer($this);
++
++        $this->scopes[$scopeName] = $scope;
++        $this->levels[$scopeName] = $level;
++        asort($this->levels);
++
++        if (null === $this->defaultScope) {
++            $this->defaultScope = $scopeName;
++        }
++
++        $this->buildServiceMap();
+     }
+ 
+-    /**
+-     * Returns true if the given service is defined.
+-     *
+-     * @param  string  $id      The service identifier
+-     *
+-     * @return Boolean true if the service is defined, false otherwise
+-     */
++    public function setDefaultScope($scopeName)
++    {
++        if (!isset($this->scopes[$scopeName])) {
++            throw new \InvalidArgumentException(sprintf('There is no "%s" scope.', $scopeName));
++        }
++
++        $this->defaultScope = $scopeName;
++    }
++
++    /** {@inheritDoc} */
++    public function enterScope($scopeName)
++    {
++        if (!isset($this->scopes[$scopeName])) {
++            throw new \InvalidArgumentException(sprintf('There is no "%s" scope.', $scopeName));
++        }
++
++        $this->scopes[$scopeName]->enter();
++    }
++
++    /** {@inheritDoc} */
++    public function leaveScope($scopeName)
++    {
++        if (!isset($this->scopes[$scopeName])) {
++            throw new \InvalidArgumentException(sprintf('There is no "%s" scope.', $scopeName));
++        }
++
++        $this->scopes[$scopeName]->leave();
++    }
++
++    /** {@inheritDoc} */
+     public function has($id)
+     {
+         $id = strtolower($id);
+ 
+-        return isset($this->services[$id]) || method_exists($this, 'get'.strtr($id, array('_' => '', '.' => '_')).'Service');
++        return isset($this->serviceMap[$id]);
+     }
+ 
+-    /**
+-     * Gets a service.
+-     *
+-     * If a service is both defined through a set() method and
+-     * with a set*Service() method, the former has always precedence.
+-     *
+-     * @param  string $id              The service identifier
+-     * @param  int    $invalidBehavior The behavior when the service does not exist
+-     *
+-     * @return object The associated service
+-     *
+-     * @throws \InvalidArgumentException if the service is not defined
+-     *
+-     * @see Reference
+-     */
+-    public function get($id, $invalidBehavior = self::EXCEPTION_ON_INVALID_REFERENCE)
++    /** {@inheritDoc} */
++    public function get($id, $invalidBehavior = ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE)
+     {
+         $id = strtolower($id);
+ 
+-        if (isset($this->services[$id])) {
+-            return $this->services[$id];
+-        }
+-
+         if (isset($this->loading[$id])) {
+             throw new \LogicException(sprintf('Circular reference detected for service "%s" (services currently loading: %s).', $id, implode(', ', array_keys($this->loading))));
+         }
+ 
+-        if (method_exists($this, $method = 'get'.strtr($id, array('_' => '', '.' => '_')).'Service')) {
++        if (isset($this->serviceMap[$id])) {
+             $this->loading[$id] = true;
++            $scopeName = $this->serviceMap[$id];
+ 
+-            $service = $this->$method();
++            if (null === $this->currentScope) {
++                $this->currentScope = $scopeName;
++            } elseif ($this->levels[$scopeName] > $this->levels[$this->currentScope]) {
++                // InaccessibleScopeException
++                throw new \LogicException(sprintf('Services in the "%s" scope (i.e. "%s") are not available to services in the "%s" scope.', $scopeName, $id, $this->currentScope));
++            }
+ 
+-            unset($this->loading[$id]);
++            // fetch service
++            $instance = $this->scopes[$scopeName]->get($id);
+ 
+-            return $service;
+-        }
++            // reset level and loading
++            $this->currentScope = null;
++            unset($this->loading[$id]);
+ 
+-        if (self::EXCEPTION_ON_INVALID_REFERENCE === $invalidBehavior) {
++            return $instance;
++        } elseif (ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE == $invalidBehavior) {
+             throw new \InvalidArgumentException(sprintf('The service "%s" does not exist.', $id));
+         }
+     }
+ 
+-    /**
+-     * Gets all service ids.
+-     *
+-     * @return array An array of all defined service ids
+-     */
+-    public function getServiceIds()
++    /** {@inheritDoc} */
++    public function set($id, $service, $scopeName = null)
+     {
+-        $ids = array();
+-        $r = new \ReflectionClass($this);
+-        foreach ($r->getMethods() as $method) {
+-            if (preg_match('/^get(.+)Service$/', $name = $method->getName(), $match)) {
+-                $ids[] = self::underscore($match[1]);
+-            }
++        $id = strtolower($id);
++
++        if (null === $scopeName) {
++            // use the mapped scope or default to the first scope
++            $scopeName = isset($this->serviceMap[$id]) ? $this->serviceMap[$id] : $this->defaultScope;
++        } elseif (isset($this->serviceMap[$id]) && $this->serviceMap[$id] != $scopeName) {
++            // ScopeMismatchException
++            throw new \LogicException(sprintf('There is already a "%s" service set on the "%s" scope.', $id, $this->serviceMap[$id]));
+         }
+ 
+-        return array_merge($ids, array_keys($this->services));
++        if (!isset($this->scopes[$scopeName])) {
++            // InvalidScopeException
++            throw new \InvalidArgumentException($scopeName ? sprintf('There is no "%s" scope.', $scopeName) : 'There are no scopes registered');
++        }
++
++        $this->scopes[$scopeName]->set($id, $service);
++        $this->serviceMap[$id] = $scopeName;
+     }
+ 
+-    static public function camelize($id)
++    /** {@inheritDoc} */
++    public function getServiceIds()
+     {
+-        return preg_replace(array('/(?:^|_)+(.)/e', '/\.(.)/e'), array("strtoupper('\\1')", "'_'.strtoupper('\\1')"), $id);
++        return array_keys($this->serviceMap);
+     }
+ 
+-    static public function underscore($id)
++    /**
++     * Builds the map of service id to scope name.
++     *
++     * Scopes from lower levels will take precedence over duplicate ids from
++     * higher level scopes.
++     */
++    protected function buildServiceMap()
+     {
+-        return strtolower(preg_replace(array('/([A-Z]+)([A-Z][a-z])/', '/([a-z\d])([A-Z])/'), array('\\1_\\2', '\\1_\\2'), strtr($id, '_', '.')));
++        $serviceMap = array();
++        foreach ($this->levels as $scopeName => $level) {
++            foreach ($this->scopes[$scopeName]->getServiceIds() as $id) {
++                if (!isset($serviceMap[$id])) {
++                    $serviceMap[$id] = $scopeName;
++                }
++            }
++        }
++
++        $this->serviceMap = $serviceMap;
+     }
+ }
+Only in ../symfony/2.0/src/Symfony/Component/DependencyInjection/: ContainerAware.php
+Only in ../symfony/2.0/src/Symfony/Component/DependencyInjection/: ContainerAwareInterface.php
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/ContainerBuilder.php src/Symfony/Component/DependencyInjection/ContainerBuilder.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/ContainerBuilder.php	2011-01-19 07:44:53.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/ContainerBuilder.php	2011-01-19 07:40:02.000000000 -0800
+@@ -15,10 +15,12 @@
+ use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
+ use Symfony\Component\DependencyInjection\Compiler\PassConfig;
+ use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
++use Symfony\Component\DependencyInjection\Factory\FactoryBuilder;
+ use Symfony\Component\DependencyInjection\InterfaceInjector;
+ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
+ use Symfony\Component\DependencyInjection\Resource\FileResource;
+ use Symfony\Component\DependencyInjection\Resource\ResourceInterface;
++use Symfony\Component\DependencyInjection\Scope\ScopeInterface;
+ 
+ /**
+  * ContainerBuilder is a DI container that provides an API to easily describe services.
+@@ -29,7 +31,11 @@
+ {
+     static protected $extensions = array();
+ 
+-    protected $definitions      = array();
++    /**
++     * @var array An array of factories, indexed by scope name
++     */
++    protected $factories = array();
++
+     protected $aliases          = array();
+     protected $loading          = array();
+     protected $resources        = array();
+@@ -38,20 +44,6 @@
+     protected $compiler;
+ 
+     /**
+-     * Constructor
+-     * @param ParameterBagInterface $parameterBag
+-     */
+-    public function __construct(ParameterBagInterface $parameterBag = null)
+-    {
+-        parent::__construct($parameterBag);
+-
+-        $this->compiler = new Compiler();
+-        foreach ($this->compiler->getPassConfig()->getPasses() as $pass) {
+-            $this->addObjectResource($pass);
+-        }
+-    }
+-
+-    /**
+      * Registers an extension.
+      *
+      * @param ExtensionInterface $extension An extension instance
+@@ -77,12 +69,86 @@
+         return static::$extensions[$name];
+     }
+ 
++    /**
++     * Checks if an extension is registered.
++     *
++     * @param string $name An alias or a namespace
++     *
++     * @return Boolean
++     */
+     static public function hasExtension($name)
+     {
+         return isset(static::$extensions[$name]);
+     }
+ 
+     /**
++     * Constructor
++     *
++     * @param ParameterBagInterface $parameterBag
++     */
++    public function __construct(ParameterBagInterface $parameterBag = null)
++    {
++        parent::__construct($parameterBag);
++
++        $this->compiler = new Compiler();
++        foreach ($this->compiler->getPassConfig()->getPasses() as $pass) {
++            $this->addObjectResource($pass);
++        }
++    }
++
++    /**
++     * Registers a scope to the current container.
++     *
++     * @param string $scopeName The scope name
++     * @param ScopeInterface $scope The scope
++     * @param integer $level The level
++     */
++    public function registerScope($scopeName, ScopeInterface $scope, $level = 0)
++    {
++        if ($this->isFrozen()) {
++            throw new \LogicException('Cannot register a scope on a frozen container.');
++        }
++
++        parent::registerScope($scopeName, $scope, $level);
++
++        // drop in a factory we can work with
++        if (!isset($this->factories[$scopeName])) {
++            $this->factories[$scopeName] = new FactoryBuilder($this->parameterBag);
++        }
++        $scope->setFactory($this->factories[$scopeName]);
++    }
++
++    /**
++     * Returns an array of scopes.
++     *
++     * @return array An array of scope names and scopes
++     */
++    public function getScopes()
++    {
++        return $this->scopes;
++    }
++
++    /**
++     * Returns an array of scope levels.
++     *
++     * @return array An array of scope names and levels
++     */
++    public function getScopeLevels()
++    {
++        return $this->levels;
++    }
++
++    /**
++     * Returns an array of factory builders.
++     *
++     * @return array An array of scope names and factories
++     */
++    public function getFactories()
++    {
++        return $this->factories;
++    }
++
++    /**
+      * Returns an array of resources loaded to build this configuration.
+      *
+      * @return ResourceInterface[] An array of resources
+@@ -183,30 +249,19 @@
+      *
+      * @param string $id      The service identifier
+      * @param object $service The service instance
++     * @param string $scope   The scope name
+      *
+      * @throws BadMethodCallException
+      */
+-    public function set($id, $service)
++    public function set($id, $service, $scope = null)
+     {
+         if ($this->isFrozen()) {
+             throw new \BadMethodCallException('Setting service on a frozen container is not allowed');
+         }
+ 
+-        $id = strtolower($id);
+-
+-        unset($this->definitions[$id], $this->aliases[$id]);
+-
+-        parent::set($id, $service);
+-    }
++        unset($this->aliases[strtolower($id)]);
+ 
+-    /**
+-     * Removes a service.
+-     *
+-     * @param string $id The service identifier
+-     */
+-    public function remove($id)
+-    {
+-        unset($this->definitions[strtolower($id)]);
++        parent::set($id, $service, $scope);
+     }
+ 
+     /**
+@@ -220,7 +275,9 @@
+     {
+         $id = strtolower($id);
+ 
+-        return isset($this->definitions[$id]) || isset($this->aliases[$id]) || parent::has($id);
++        $this->buildServiceMap();
++
++        return isset($this->aliases[$id]) || parent::has($id);
+     }
+ 
+     /**
+@@ -240,6 +297,8 @@
+     {
+         $id = strtolower($id);
+ 
++        $this->buildServiceMap();
++
+         try {
+             return parent::get($id, ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE);
+         } catch (\InvalidArgumentException $e) {
+@@ -364,7 +423,9 @@
+      */
+     public function getServiceIds()
+     {
+-        return array_unique(array_merge(array_keys($this->getDefinitions()), array_keys($this->aliases), parent::getServiceIds()));
++        $this->buildServiceMap();
++
++        return array_unique(array_merge(array_keys($this->aliases), parent::getServiceIds()));
+     }
+ 
+     /**
+@@ -402,11 +463,11 @@
+ 
+         if (is_string($id)) {
+             $id = new Alias($id);
+-        } else if (!$id instanceof Alias) {
++        } elseif (!$id instanceof Alias) {
+             throw new \InvalidArgumentException('$id must be a string, or an Alias object.');
+         }
+ 
+-        unset($this->definitions[$alias]);
++        $this->removeDefinition($alias);
+ 
+         $this->aliases[$alias] = $id;
+     }
+@@ -539,18 +600,41 @@
+      *
+      * @param  string $id    The service identifier
+      * @param  string $class The service class
++     * @param  string $scope The scope name
+      *
+      * @return Definition A Definition instance
+      */
+-    public function register($id, $class = null)
++    public function register($id, $class = null, $scope = null)
++    {
++        $definition = new Definition($class);
++
++        if (null !== $scope) {
++            $definition->setScope($scope);
++        }
++
++        return $this->setDefinition(strtolower($id), $definition);
++    }
++
++    /**
++     * Removes a definition.
++     *
++     * @param string $id The service identifier
++     */
++    public function removeDefinition($id)
+     {
+-        return $this->setDefinition(strtolower($id), new Definition($class));
++        $id = strtolower($id);
++
++        unset($this->aliases[$id]);
++
++        foreach ($this->factories as $factory) {
++            $factory->removeDefinition($id);
++        }
+     }
+ 
+     /**
+      * Adds the service definitions.
+      *
+-     * @param Definition[] $definitions An array of service definitions
++     * @param array $definitions An array of service ids and definitions
+      */
+     public function addDefinitions(array $definitions)
+     {
+@@ -562,11 +646,14 @@
+     /**
+      * Sets the service definitions.
+      *
+-     * @param array $definitions An array of service definitions
++     * @param array $definitions An array of service ids and definitions
+      */
+     public function setDefinitions(array $definitions)
+     {
+-        $this->definitions = array();
++        foreach ($this->factories as $factory) {
++            $factory->setDefinitions(array());
++        }
++
+         $this->addDefinitions($definitions);
+     }
+ 
+@@ -577,7 +664,11 @@
+      */
+     public function getDefinitions()
+     {
+-        return $this->definitions;
++        $definitions = array();
++        foreach ($this->factories as $factory) {
++            $definitions = array_merge($definitions, $factory->getDefinitions());
++        }
++        return $definitions;
+     }
+ 
+     /**
+@@ -596,9 +687,17 @@
+ 
+         $id = strtolower($id);
+ 
+-        unset($this->aliases[$id]);
++        $this->removeDefinition($id);
++
++        if (!$scopeName = $definition->getScope()) {
++            $definition->setScope($scopeName = $this->defaultScope);
++        }
+ 
+-        return $this->definitions[$id] = $definition;
++        if (!isset($this->factories[$scopeName])) {
++            $this->factories[$scopeName] = new FactoryBuilder($this->parameterBag);
++        }
++
++        return $this->factories[$scopeName]->setDefinition($id, $definition);
+     }
+ 
+     /**
+@@ -610,7 +709,15 @@
+      */
+     public function hasDefinition($id)
+     {
+-        return array_key_exists(strtolower($id), $this->definitions);
++        $id = strtolower($id);
++
++        foreach ($this->factories as $factory) {
++            if ($factory->hasDefinition($id)) {
++                return true;
++            }
++        }
++
++        return false;
+     }
+ 
+     /**
+@@ -626,11 +733,13 @@
+     {
+         $id = strtolower($id);
+ 
+-        if (!$this->hasDefinition($id)) {
+-            throw new \InvalidArgumentException(sprintf('The service definition "%s" does not exist.', $id));
++        foreach ($this->factories as $factory) {
++            if ($factory->hasDefinition($id)) {
++                return $factory->getDefinition($id);
++            }
+         }
+ 
+-        return $this->definitions[$id];
++        throw new \InvalidArgumentException(sprintf('The service definition "%s" does not exist.', $id));
+     }
+ 
+     /**
+@@ -656,99 +765,6 @@
+     }
+ 
+     /**
+-     * Creates a service for a service definition.
+-     *
+-     * @param  Definition $definition A service definition instance
+-     * @param  string     $id         The service identifier
+-     *
+-     * @return object              The service described by the service definition
+-     *
+-     * @throws \InvalidArgumentException When configure callable is not callable
+-     */
+-    protected function createService(Definition $definition, $id)
+-    {
+-        if (null !== $definition->getFile()) {
+-            require_once $this->getParameterBag()->resolveValue($definition->getFile());
+-        }
+-
+-        $arguments = $this->resolveServices($this->getParameterBag()->resolveValue($definition->getArguments()));
+-
+-        if (null !== $definition->getFactoryMethod()) {
+-            if (null !== $definition->getFactoryService()) {
+-                $factory = $this->get($this->getParameterBag()->resolveValue($definition->getFactoryService()));
+-            } else {
+-                $factory = $this->getParameterBag()->resolveValue($definition->getClass());
+-            }
+-
+-            $service = call_user_func_array(array($factory, $definition->getFactoryMethod()), $arguments);
+-        } else {
+-            $r = new \ReflectionClass($this->getParameterBag()->resolveValue($definition->getClass()));
+-
+-            $service = null === $r->getConstructor() ? $r->newInstance() : $r->newInstanceArgs($arguments);
+-        }
+-
+-        foreach ($this->getInterfaceInjectors($service) as $injector) {
+-            $injector->processDefinition($definition, $service);
+-        }
+-
+-        if ($definition->isShared()) {
+-            $this->services[strtolower($id)] = $service;
+-        }
+-
+-        foreach ($definition->getMethodCalls() as $call) {
+-            $services = self::getServiceConditionals($call[1]);
+-
+-            $ok = true;
+-            foreach ($services as $s) {
+-                if (!$this->has($s)) {
+-                    $ok = false;
+-                    break;
+-                }
+-            }
+-
+-            if ($ok) {
+-                call_user_func_array(array($service, $call[0]), $this->resolveServices($this->getParameterBag()->resolveValue($call[1])));
+-            }
+-        }
+-
+-        if ($callable = $definition->getConfigurator()) {
+-            if (is_array($callable) && is_object($callable[0]) && $callable[0] instanceof Reference) {
+-                $callable[0] = $this->get((string) $callable[0]);
+-            } elseif (is_array($callable)) {
+-                $callable[0] = $this->getParameterBag()->resolveValue($callable[0]);
+-            }
+-
+-            if (!is_callable($callable)) {
+-                throw new \InvalidArgumentException(sprintf('The configure callable for class "%s" is not a callable.', get_class($service)));
+-            }
+-
+-            call_user_func($callable, $service);
+-        }
+-
+-        return $service;
+-    }
+-
+-    /**
+-     * Replaces service references by the real service instance.
+-     *
+-     * @param  mixed $value A value
+-     *
+-     * @return mixed The same value with all service references replaced by the real service instances
+-     */
+-    public function resolveServices($value)
+-    {
+-        if (is_array($value)) {
+-            foreach ($value as &$v) {
+-                $v = $this->resolveServices($v);
+-            }
+-        } else if (is_object($value) && $value instanceof Reference) {
+-            $value = $this->get((string) $value, $value->getInvalidBehavior());
+-        }
+-
+-        return $value;
+-    }
+-
+-    /**
+      * Returns service ids for a given tag.
+      *
+      * @param string $name The tag name
+@@ -766,19 +782,4 @@
+ 
+         return $tags;
+     }
+-
+-    static public function getServiceConditionals($value)
+-    {
+-        $services = array();
+-
+-        if (is_array($value)) {
+-            foreach ($value as $v) {
+-                $services = array_unique(array_merge($services, self::getServiceConditionals($v)));
+-            }
+-        } elseif (is_object($value) && $value instanceof Reference && $value->getInvalidBehavior() === ContainerInterface::IGNORE_ON_INVALID_REFERENCE) {
+-            $services[] = (string) $value;
+-        }
+-
+-        return $services;
+-    }
+ }
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/ContainerInterface.php src/Symfony/Component/DependencyInjection/ContainerInterface.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/ContainerInterface.php	2011-01-19 07:44:53.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/ContainerInterface.php	2011-01-18 07:16:28.000000000 -0800
+@@ -1,20 +1,11 @@
+ <?php
+ 
+-/*
+- * This file is part of the Symfony package.
+- *
+- * (c) Fabien Potencier <fabien.potencier@symfony-project.com>
+- *
+- * For the full copyright and license information, please view the LICENSE
+- * file that was distributed with this source code.
+- */
+-
+ namespace Symfony\Component\DependencyInjection;
+ 
++use Symfony\Component\DependencyInjection\Factory\FactoryInterface;
++
+ /**
+- * ContainerInterface is the interface implemented by service container classes.
+- *
+- * @author Fabien Potencier <fabien.potencier@symfony-project.com>
++ * A container is something that knows how to create and store services.
+  */
+ interface ContainerInterface
+ {
+@@ -23,33 +14,36 @@
+     const IGNORE_ON_INVALID_REFERENCE    = 3;
+ 
+     /**
+-     * Sets a service.
++     * Checks if the factory knows how to create a service.
++     *
++     * @param string $id The service id
+      *
+-     * @param string $id      The service identifier
+-     * @param object $service The service instance
++     * @return Boolean Whether the factory knows how to create the service
+      */
+-    function set($id, $service);
++    function has($id);
+ 
+     /**
+-     * Gets a service.
+-     *
+-     * @param  string $id              The service identifier
+-     * @param  int    $invalidBehavior The behavior when the service does not exist
++     * Gets an instance of a service.
+      *
+-     * @return object The associated service
++     * @param string  $id              The service id
++     * @param integer $invalidBehavior The behavior when the service does not exist
+      *
+-     * @throws \InvalidArgumentException if the service is not defined
+-     *
+-     * @see Reference
++     * @return object A new object instance
+      */
+     function get($id, $invalidBehavior = self::EXCEPTION_ON_INVALID_REFERENCE);
+ 
+     /**
+-     * Returns true if the given service is defined.
++     * Sets a service on the current container.
+      *
+-     * @param  string  $id      The service identifier
++     * @param string $id      The service id
++     * @param mixed  $service An instance of the service
++     */
++    function set($id, $service);
++
++    /**
++     * Returns an array of service ids the current container supports.
+      *
+-     * @return Boolean true if the service is defined, false otherwise
++     * @return array An array of service ids
+      */
+-    function has($id);
++    function getServiceIds();
+ }
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/Definition.php src/Symfony/Component/DependencyInjection/Definition.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/Definition.php	2011-01-18 07:02:01.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/Definition.php	2011-01-19 05:28:24.000000000 -0800
+@@ -22,7 +22,7 @@
+     protected $file;
+     protected $factoryMethod;
+     protected $factoryService;
+-    protected $shared;
++    protected $scope;
+     protected $arguments;
+     protected $calls;
+     protected $configurator;
+@@ -40,7 +40,6 @@
+         $this->class = $class;
+         $this->arguments = $arguments;
+         $this->calls = array();
+-        $this->shared = true;
+         $this->tags = array();
+         $this->public = true;
+     }
+@@ -312,27 +311,27 @@
+     }
+ 
+     /**
+-     * Sets if the service must be shared or not.
++     * Sets the service scope.
+      *
+-     * @param  Boolean $shared Whether the service must be shared or not
++     * @param  string $scope The scope name
+      *
+      * @return Definition The current instance
+      */
+-    public function setShared($shared)
++    public function setScope($scope)
+     {
+-        $this->shared = (Boolean) $shared;
++        $this->scope = $scope;
+ 
+         return $this;
+     }
+ 
+     /**
+-     * Returns true if the service must be shared.
++     * Returns the service scope.
+      *
+-     * @return Boolean true if the service is shared, false otherwise
++     * @return string The scope name
+      */
+-    public function isShared()
++    public function getScope()
+     {
+-        return $this->shared;
++        return $this->scope;
+     }
+ 
+     /**
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/Dumper/GraphvizDumper.php src/Symfony/Component/DependencyInjection/Dumper/GraphvizDumper.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/Dumper/GraphvizDumper.php	2011-01-18 07:02:01.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/Dumper/GraphvizDumper.php	2011-01-19 07:09:19.000000000 -0800
+@@ -135,7 +135,7 @@
+         $container = clone $this->container;
+ 
+         foreach ($container->getDefinitions() as $id => $definition) {
+-            $nodes[$id] = array('class' => str_replace('\\', '\\\\', $this->container->getParameterBag()->resolveValue($definition->getClass())), 'attributes' => array_merge($this->options['node.definition'], array('style' => $definition->isShared() ? 'filled' : 'dotted')));
++            $nodes[$id] = array('class' => str_replace('\\', '\\\\', $this->container->getParameterBag()->resolveValue($definition->getClass())), 'attributes' => array_merge($this->options['node.definition'], array('style' => 'filled')));
+ 
+             $container->setDefinition($id, new Definition('stdClass'));
+         }
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/Dumper/PhpDumper.php src/Symfony/Component/DependencyInjection/Dumper/PhpDumper.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/Dumper/PhpDumper.php	2011-01-19 07:44:53.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/Dumper/PhpDumper.php	2011-01-19 07:05:45.000000000 -0800
+@@ -16,6 +16,7 @@
+ use Symfony\Component\DependencyInjection\ContainerBuilder;
+ use Symfony\Component\DependencyInjection\Container;
+ use Symfony\Component\DependencyInjection\ContainerInterface;
++use Symfony\Component\DependencyInjection\Factory\StaticFactory;
+ use Symfony\Component\DependencyInjection\Reference;
+ use Symfony\Component\DependencyInjection\Parameter;
+ 
+@@ -49,7 +50,7 @@
+     {
+         parent::__construct($container);
+ 
+-        $this->inlinedDefinitions = new \SplObjectStorage;
++        $this->inlinedDefinitions = new \SplObjectStorage();
+     }
+ 
+     /**
+@@ -67,17 +68,18 @@
+     public function dump(array $options = array())
+     {
+         $options = array_merge(array(
+-            'class'      => 'ProjectServiceContainer',
+-            'base_class' => 'Container',
++            'class_prefix' => 'Project',
++            'base_class'   => 'Container',
+         ), $options);
+ 
+         return
+-            $this->startClass($options['class'], $options['base_class']).
++            $this->startContainer($options['class_prefix'], $options['base_class']).
+             $this->addConstructor().
+-            $this->addServices().
++            $this->addScopeRegistration($options['class_prefix']).
+             $this->addDefaultParametersMethod().
+             $this->addInterfaceInjectors().
+-            $this->endClass()
++            $this->endContainer().
++            $this->addScopes($options['class_prefix'])
+         ;
+     }
+ 
+@@ -267,20 +269,12 @@
+             $arguments[] = $this->dumpValue($value);
+         }
+ 
+-        $simple = $this->isSimpleInstance($id, $definition);
+-
+-        $instantiation = '';
+-        if ($definition->isShared()) {
+-            $instantiation = "\$this->services['$id'] = ".($simple ? '' : '$instance');
+-        } elseif (!$simple) {
+-            $instantiation = '$instance';
+-        }
+-
+-        $return = '';
+-        if ($simple) {
++        if ($simple = $this->isSimpleInstance($id, $definition)) {
++            $instantiation = '';
+             $return = 'return ';
+         } else {
+-            $instantiation .= ' = ';
++            $instantiation = '$instance = ';
++            $return = '';
+         }
+ 
+         if (null !== $definition->getFactoryMethod()) {
+@@ -386,7 +380,7 @@
+ 
+     protected function addService($id, $definition)
+     {
+-        $name = Container::camelize($id);
++        $name = StaticFactory::camelize($id);
+         $this->definitionVariables = new \SplObjectStorage();
+         $this->referenceVariables = array();
+         $this->variableCount = 0;
+@@ -399,15 +393,6 @@
+         }
+ 
+         $doc = '';
+-        if ($definition->isShared()) {
+-            $doc .= <<<EOF
+-
+-     *
+-     * This service is shared.
+-     * This method always returns the same instance of the service.
+-EOF;
+-        }
+-
+         if (!$definition->isPublic()) {
+             $doc .= <<<EOF
+ 
+@@ -425,7 +410,7 @@
+      *
+      * $return
+      */
+-    protected function get{$name}Service()
++    protected function create{$name}Service()
+     {
+ 
+ EOF;
+@@ -449,7 +434,7 @@
+ 
+     protected function addServiceAlias($alias, $id)
+     {
+-        $name = Container::camelize($alias);
++        $name = StaticFactory::camelize($alias);
+         $type = 'Object';
+ 
+         if ($this->container->hasDefinition($id)) {
+@@ -490,10 +475,12 @@
+         return $publicServices.$aliasServices.$privateServices;
+     }
+ 
+-    protected function startClass($class, $baseClass)
++    protected function startContainer($prefix, $baseClass)
+     {
+         $bagClass = $this->container->isFrozen() ? 'FrozenParameterBag' : 'ParameterBag';
+ 
++        $class = $prefix.'Container';
++
+         return <<<EOF
+ <?php
+ 
+@@ -531,6 +518,39 @@
+ EOF;
+     }
+ 
++    protected function addScopeRegistration($prefix)
++    {
++        $scopes = $this->container->getScopes();
++        $levels = $this->container->getLevels();
++        $factories = $this->container->getFactories();
++
++        if (!count($scopes)) {
++            return '';
++        }
++
++        $parts = array();
++        foreach ($scopes as $scopeName => $scope) {
++            if (!isset($levels[$scopeName]) || 0 === $levels[$scopeName]) {
++                $parts[] = sprintf('$this->registerScope(%s, new %sScope());', var_export($scopeName, true), $prefix);
++            } else {
++                $parts[] = sprintf('$this->registerScope(%s, new %sScope(), %s);', var_export($scopeName, true), $prefix, $levels[$scopeName]);
++            }
++        }
++        $code = implode("\n        ", $parts);
++
++        return <<<EOF
++
++    /**
++     * Registers scopes to the current container.
++     */
++    protected function setupScopes()
++    {
++        $code
++    }
++
++EOF;
++    }
++
+     protected function addDefaultParametersMethod()
+     {
+         if (!$this->container->getParameterBag()->all()) {
+@@ -576,7 +596,7 @@
+         return sprintf("array(\n%s\n%s)", implode("\n", $php), str_repeat(' ', $indent - 4));
+     }
+ 
+-    protected function endClass()
++    protected function endContainer()
+     {
+         return <<<EOF
+ }
+@@ -756,23 +776,23 @@
+             return $this->dumpValue($this->container->getParameter($name), false);
+         }
+ 
+-        return sprintf("\$this->getParameter('%s')", strtolower($name));
++        return sprintf("\$container->getParameter('%s')", strtolower($name));
+     }
+ 
+     protected function getServiceCall($id, Reference $reference = null)
+     {
+         if ('service_container' === $id) {
+-            return '$this';
++            return '$container';
+         }
+ 
+         if (null !== $reference && ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE !== $reference->getInvalidBehavior()) {
+-            return sprintf('$this->get(\'%s\', ContainerInterface::NULL_ON_INVALID_REFERENCE)', $id);
++            return sprintf('$container->get(\'%s\', ContainerInterface::NULL_ON_INVALID_REFERENCE)', $id);
+         } else {
+             if ($this->container->hasAlias($id)) {
+                 $id = (string) $this->container->getAlias($id);
+             }
+ 
+-            return sprintf('$this->get(\'%s\')', $id);
++            return sprintf('$container->get(\'%s\')', $id);
+         }
+     }
+ 
+@@ -816,4 +836,78 @@
+             return $name;
+         }
+     }
++
++    protected function addScopes($prefix)
++    {
++        $code = '';
++
++        foreach ($this->container->getScopes() as $scopeName => $scope)
++        {
++            $code .=
++                $this->startScope($prefix, $scopeName, get_class($scope)).
++                $this->addScopeMethods($prefix).
++                $this->endClass().
++                $this->startFactory($prefix, $scopeName).
++                $this->addServices().
++                $this->endClass()
++            ;
++        }
++
++        return $code;
++    }
++
++    protected function startScope($prefix, $scopeName, $baseClass)
++    {
++        $class = $prefix.$scopeName.'Scope';
++
++        return <<<EOF
++
++/**
++ * The $scopeName scope.
++ */
++class $class extends $baseClass
++{
++EOF;
++    }
++
++    protected function addScopeMethods($prefix, $scopeName)
++    {
++        $class = $prefix.$scopeName.'Factory';
++
++        return <<<EOF
++
++    public function __construct()
++    {
++        parent::__construct(new $class());
++    }
++
++    public function setFactory(FactoryInterface $factory)
++    {
++        throw new BadMethodCallException('Changing the scope factory is not allowed.');
++    }
++
++EOF;
++    }
++
++    protected function endClass()
++    {
++        return <<<EOF
++}
++
++EOF;
++    }
++
++    protected function startFactory($prefix, $scopeName)
++    {
++        $class = $prefix.$scopeName.'Factory';
++
++        return <<<EOF
++
++/**
++ * The $scopeName scope factory.
++ */
++class $class extends StaticFactory
++{
++EOF;
++    }
+ }
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/Dumper/XmlDumper.php src/Symfony/Component/DependencyInjection/Dumper/XmlDumper.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/Dumper/XmlDumper.php	2011-01-19 07:44:53.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/Dumper/XmlDumper.php	2011-01-19 07:10:02.000000000 -0800
+@@ -46,6 +46,7 @@
+         $container->setAttribute('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance');
+         $container->setAttribute('xsi:schemaLocation', 'http://www.symfony-project.org/schema/dic/services http://www.symfony-project.org/schema/dic/services/services-1.0.xsd');
+ 
++        $this->addScopes($container);
+         $this->addParameters($container);
+         $this->addServices($container);
+         $this->addInterfaceInjectors($container);
+@@ -57,6 +58,30 @@
+         return $xml;
+     }
+ 
++    protected function addScopes(\DOMElement $parent)
++    {
++        $scopes = $this->container->getScopes();
++        $levels = $this->container->getLevels();
++
++        $node = $this->document->createElement('scopes');
++        $parent->appendChild($node);
++
++        foreach ($scopes as $scopeName => $scope) {
++            $this->addScope($node, $scopeName, $scope, isset($levels[$scopeName]) ? $levels[$scopeName] : null);
++        }
++    }
++
++    protected function addScope(\DOMElement $parent, $scopeName, $scope, $level = null)
++    {
++        $node = $this->document->createElement('scope');
++        $node->setAttribute('name', $scopeName);
++        $node->setAttribute('class', get_class($scope));
++        if (null !== $level) {
++            $node->setAttribute('level', $level);
++        }
++        $parent->appendChild($node);
++    }
++
+     protected function addParameters(\DOMElement $parent)
+     {
+         $data = $this->container->getParameterBag()->all();
+@@ -116,13 +141,13 @@
+             $service->setAttribute('class', $definition->getClass());
+         }
+         if ($definition->getFactoryMethod()) {
+-            $service->setAttribute ('factory-method', $definition->getFactoryMethod());
++            $service->setAttribute('factory-method', $definition->getFactoryMethod());
+         }
+         if ($definition->getFactoryService()) {
+-            $service->setAttribute ('factory-service', $definition->getFactoryService());
++            $service->setAttribute('factory-service', $definition->getFactoryService());
+         }
+-        if (!$definition->isShared()) {
+-            $service->setAttribute ('shared', 'false');
++        if ($definition->getScope()) {
++            $service->setAttribute('scope', $definition->getScope());
+         }
+ 
+         foreach ($definition->getTags() as $name => $tags) {
+@@ -206,11 +231,10 @@
+                 $element->setAttribute('type', 'service');
+                 $element->setAttribute('id', (string) $value);
+                 $behaviour = $value->getInvalidBehavior();
+-                if ($behaviour == ContainerInterface::NULL_ON_INVALID_REFERENCE) {
++                if ($behaviour == ContainerInterface::NULL_ON_INVALID_REFERENCE)
+                     $element->setAttribute('on-invalid', 'null');
+-                } else if ($behaviour == ContainerInterface::IGNORE_ON_INVALID_REFERENCE) {
++                else if ($behaviour == ContainerInterface::IGNORE_ON_INVALID_REFERENCE)
+                     $element->setAttribute('on-invalid', 'ignore');
+-                }
+             } else if (is_object($value) && $value instanceof Definition) {
+                 $element->setAttribute('type', 'service');
+                 $this->addService($value, null, $element);
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/Dumper/YamlDumper.php src/Symfony/Component/DependencyInjection/Dumper/YamlDumper.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/Dumper/YamlDumper.php	2011-01-18 07:02:01.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/Dumper/YamlDumper.php	2011-01-19 07:11:00.000000000 -0800
+@@ -95,8 +95,8 @@
+             $code .= sprintf("    calls:\n      %s\n", str_replace("\n", "\n      ", Yaml::dump($this->dumpValue($definition->getMethodCalls()), 1)));
+         }
+ 
+-        if (!$definition->isShared()) {
+-            $code .= "    shared: false\n";
++        if ($definition->getScope()) {
++            $code .= sprintf("    scope: %s\n", Yaml::dump($definition->getScope()));
+         }
+ 
+         if ($callable = $definition->getConfigurator()) {
+Only in ../symfony/2.0/src/Symfony/Component/DependencyInjection/: Exception
+Only in src/Symfony/Component/DependencyInjection/: Factory
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/InterfaceInjector.php src/Symfony/Component/DependencyInjection/InterfaceInjector.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/InterfaceInjector.php	2011-01-18 05:01:04.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/InterfaceInjector.php	2011-01-19 07:24:58.000000000 -0800
+@@ -101,7 +101,7 @@
+         }
+ 
+         if ( ! is_object($object)) {
+-            throw new InvalidArgumentException(sprintf("%s expects class or object, %s given", __METHOD__, substr(str_replace("\n", '', var_export($object, true)), 0, 10)));
++            throw new \InvalidArgumentException(sprintf("%s expects class or object, %s given", __METHOD__, substr(str_replace("\n", '', var_export($object, true)), 0, 10)));
+         }
+ 
+         return is_a($object, $this->class);
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/Loader/XmlFileLoader.php src/Symfony/Component/DependencyInjection/Loader/XmlFileLoader.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/Loader/XmlFileLoader.php	2011-01-18 07:02:01.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/Loader/XmlFileLoader.php	2011-01-19 07:11:30.000000000 -0800
+@@ -55,6 +55,9 @@
+         // interface injectors
+         $this->parseInterfaceInjectors($xml, $file);
+ 
++        // scope
++        $this->parseScopes($xml, $file);
++
+         // services
+         $this->parseDefinitions($xml, $file);
+     }
+@@ -112,6 +115,24 @@
+         $this->container->addInterfaceInjector($injector);
+     }
+ 
++    protected function parseScopes(SimpleXMLElement $xml, $file)
++    {
++        if (!$xml->scopes) {
++            return;
++        }
++
++        foreach ($xml->scopes->scope as $scope) {
++            $class = (string) $scope['class'];
++            $instance = new $class();
++
++            if (isset($scope['level'])) {
++                $this->container->registerScope((string) $scope['name'], $instance, (integer) $scope['level']);
++            } else {
++                $this->container->registerScope((string) $scope['name'], $instance);
++            }
++        }
++    }
++
+     protected function parseDefinitions(SimpleXMLElement $xml, $file)
+     {
+         if (!$xml->services) {
+@@ -137,7 +158,7 @@
+ 
+         $definition = new Definition();
+ 
+-        foreach (array('class', 'shared', 'public', 'factory-method', 'factory-service') as $key) {
++        foreach (array('class', 'scope', 'public', 'factory-method', 'factory-service') as $key) {
+             if (isset($service[$key])) {
+                 $method = 'set'.str_replace('-', '', $key);
+                 $definition->$method((string) $service->getAttributeAsPhp($key));
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/Loader/YamlFileLoader.php src/Symfony/Component/DependencyInjection/Loader/YamlFileLoader.php
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/Loader/YamlFileLoader.php	2011-01-18 07:02:01.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/Loader/YamlFileLoader.php	2011-01-19 07:11:45.000000000 -0800
+@@ -66,6 +66,9 @@
+ 
+         // services
+         $this->parseDefinitions($content, $file);
++
++        // scopes
++        $this->parseScopes($content, $file);
+     }
+ 
+     /**
+@@ -144,8 +147,8 @@
+             $definition->setClass($service['class']);
+         }
+ 
+-        if (isset($service['shared'])) {
+-            $definition->setShared($service['shared']);
++        if (isset($service['scope'])) {
++            $definition->setScope($service['scope']);
+         }
+ 
+         if (isset($service['public'])) {
+@@ -194,6 +197,24 @@
+         $this->container->setDefinition($id, $definition);
+     }
+ 
++    protected function parseScopes($content, $file)
++    {
++        if (!isset($content['scopes'])) {
++            return;
++        }
++
++        foreach ($content['scopes'] as $scopeName => $scope) {
++            $class = $scope['class'];
++            $instance = new $class();
++
++            if (isset($scope['level'])) {
++                $this->container->registerScope($scopeName, $instance, $scope['level']);
++            } else {
++                $this->container->registerScope($scopeName, $instance);
++            }
++        }
++    }
++
+     protected function loadFile($file)
+     {
+         return $this->validate(Yaml::load($file), $file);
+@@ -213,7 +234,7 @@
+         }
+ 
+         foreach (array_keys($content) as $key) {
+-            if (in_array($key, array('imports', 'parameters', 'services', 'interfaces'))) {
++            if (in_array($key, array('imports', 'parameters', 'services', 'interfaces', 'scopes'))) {
+                 continue;
+             }
+ 
+diff -ru ../symfony/2.0/src/Symfony/Component/DependencyInjection/Loader/schema/dic/services/services-1.0.xsd src/Symfony/Component/DependencyInjection/Loader/schema/dic/services/services-1.0.xsd
+--- ../symfony/2.0/src/Symfony/Component/DependencyInjection/Loader/schema/dic/services/services-1.0.xsd	2011-01-19 07:44:53.000000000 -0800
++++ src/Symfony/Component/DependencyInjection/Loader/schema/dic/services/services-1.0.xsd	2011-01-19 07:11:14.000000000 -0800
+@@ -29,6 +29,7 @@
+       <xsd:element name="parameters" type="parameters" minOccurs="0" maxOccurs="1" />
+       <xsd:element name="services" type="services" minOccurs="0" maxOccurs="1" />
+       <xsd:element name="interfaces" type="interfaces" minOccurs="0" maxOccurs="1" />
++      <xsd:element name="scopes" type="scopes" minOccurs="0" maxOccurs="1" />
+       <xsd:any namespace="##other" processContents="lax" minOccurs="0" maxOccurs="unbounded" />
+     </xsd:sequence>
+   </xsd:complexType>
+@@ -40,7 +41,7 @@
+       ]]></xsd:documentation>
+     </xsd:annotation>
+     <xsd:sequence>
+-      <xsd:element name="interface" type="interface" minOccurs="0" maxOccurs="unbounded" />
++      <xsd:element name="interface" type="interface" minOccurs="1" maxOccurs="unbounded" />
+     </xsd:sequence>
+   </xsd:complexType>
+ 
+@@ -101,7 +102,7 @@
+     </xsd:choice>
+     <xsd:attribute name="id" type="xsd:string" />
+     <xsd:attribute name="class" type="xsd:string" />
+-    <xsd:attribute name="shared" type="boolean" />
++    <xsd:attribute name="scope" type="xsd:string" />
+     <xsd:attribute name="public" type="boolean" />
+     <xsd:attribute name="factory-method" type="xsd:string" />
+     <xsd:attribute name="factory-service" type="xsd:string" />
+@@ -131,6 +132,23 @@
+     <xsd:attribute name="on-invalid" type="invalid_sequence" />
+   </xsd:complexType>
+ 
++  <xsd:complexType name="scopes">
++    <xsd:annotation>
++      <xsd:documentation><![CDATA[
++        Enclosing element for the definition of all scopes
++      ]]></xsd:documentation>
++    </xsd:annotation>
++    <xsd:sequence>
++      <xsd:element name="scope" type="scope" minOccurs="1" maxOccurs="unbounded" />
++    </xsd:sequence>
++  </xsd:complexType>
++
++  <xsd:complexType name="scope">
++    <xsd:attribute name="name" type="xsd:string" use="required" />
++    <xsd:attribute name="class" type="xsd:string" use="required" />
++    <xsd:attribute name="level" type="xsd:integer" />
++  </xsd:complexType>
++
+   <xsd:complexType name="argument" mixed="true">
+     <xsd:choice maxOccurs="unbounded">
+       <xsd:element name="argument" type="argument" minOccurs="0" maxOccurs="unbounded" />
+Only in src/Symfony/Component/DependencyInjection/: Scope
+Only in src/Symfony/Component/DependencyInjection/: ScopedContainerInterface.php
