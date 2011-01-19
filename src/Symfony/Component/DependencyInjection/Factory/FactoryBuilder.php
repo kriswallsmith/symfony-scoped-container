@@ -103,21 +103,15 @@ class FactoryBuilder implements FactoryInterface
     }
 
     /**
-     * Registers a service definition.
+     * Removes a definition.
      *
-     * This methods allows for simple registration of service definition
-     * with a fluid interface.
-     *
-     * @param  string $id    The service identifier
-     * @param  string $class The service class
-     *
-     * @return Definition A Definition instance
+     * @param string $id The service identifier
      */
-    public function register($id, $class = null)
+    public function removeDefinition($id)
     {
         $id = strtolower($id);
 
-        return $this->setDefinition($id, new Definition($class));
+        unset($this->definitions[$id]);
     }
 
     /**
