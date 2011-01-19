@@ -2,6 +2,7 @@
 
 namespace Symfony\Component\DependencyInjection\Scope;
 
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Factory\FactoryInterface;
 
 /**
