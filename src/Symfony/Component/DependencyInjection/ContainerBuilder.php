@@ -15,6 +15,7 @@ use Symfony\Component\DependencyInjection\Compiler\Compiler;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
+use Symfony\Component\DependencyInjection\Factory\FactoryBuilder;
 use Symfony\Component\DependencyInjection\InterfaceInjector;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Component\DependencyInjection\Resource\FileResource;
@@ -112,7 +113,7 @@ class ContainerBuilder extends Container implements TaggedContainerInterface
 
         // drop in a factory we can work with
         if (!isset($this->factories[$scopeName])) {
-            $this->factories[$scopeName] = new FactoryBuilder();
+            $this->factories[$scopeName] = new FactoryBuilder($this->parameterBag);
         }
         $scope->setFactory($this->factories[$scopeName]);
     }
@@ -693,7 +694,7 @@ class ContainerBuilder extends Container implements TaggedContainerInterface
         }
 
         if (!isset($this->factories[$scopeName])) {
-            $this->factories[$scopeName] = new FactoryBuilder();
+            $this->factories[$scopeName] = new FactoryBuilder($this->parameterBag);
         }
 
         return $this->factories[$scopeName]->setDefinition($id, $definition);

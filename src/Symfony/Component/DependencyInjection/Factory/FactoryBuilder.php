@@ -4,6 +4,7 @@ namespace Symfony\Component\DependencyInjection\Factory;
 
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Definition;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 /**
@@ -16,7 +17,7 @@ class FactoryBuilder implements FactoryInterface
 
     public function __construct(ParameterBagInterface $parameterBag = null)
     {
-        $this->parameterBag = $parameterBag;
+        $this->parameterBag = $parameterBag ?: new ParameterBag();
         $this->definitions = array();
     }
 
