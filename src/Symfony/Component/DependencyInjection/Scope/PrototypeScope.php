@@ -41,6 +41,12 @@ class PrototypeScope implements ScopeInterface
     }
 
     /** {@inheritDoc} */
+    public function setFactory(FactoryInterface $factory)
+    {
+        $this->factory = $factory;
+    }
+
+    /** {@inheritDoc} */
     public function setContainer(ContainerInterface $container = null)
     {
         $this->container = $container;
