@@ -34,6 +34,11 @@ class Container implements ScopedContainerInterface
     protected $currentScope;
 
     /**
+     * @var string The name of the default scope
+     */
+    protected $defaultScope;
+
+    /**
      * Constructor.
      *
      * @param ParameterBagInterface $parameterBag A ParameterBagInterface instance
@@ -154,7 +159,20 @@ class Container implements ScopedContainerInterface
         $this->levels[$scopeName] = $level;
         asort($this->levels);
 
+        if (null === $this->defaultScope) {
+            $this->defaultScope = $scopeName;
+        }
+
         $this->buildServiceMap();
+    }
+
+    public function setDefaultScope($scopeName)
+    {
+        if (!isset($this->scopes[$scopeName])) {
+            throw new \InvalidArgumentException(sprintf('There is no "%s" scope.', $scopeName));
+        }
+
+        $this->defaultScope = $scopeName;
     }
 
     /** {@inheritDoc} */
@@ -225,13 +243,15 @@ class Container implements ScopedContainerInterface
 
         if (null === $scopeName) {
             // use the mapped scope or default to the first scope
-            $scopeName = isset($this->serviceMap[$id]) ? $this->serviceMap[$id] : key($this->levels);
+            $scopeName = isset($this->serviceMap[$id]) ? $this->serviceMap[$id] : $this->defaultScope;
         } elseif (isset($this->serviceMap[$id]) && $this->serviceMap[$id] != $scopeName) {
             // ScopeMismatchException
             throw new \LogicException(sprintf('There is already a "%s" service set on the "%s" scope.', $id, $this->serviceMap[$id]));
-        } elseif (!isset($this->scopes[$scopeName])) {
+        }
+
+        if (!isset($this->scopes[$scopeName])) {
             // InvalidScopeException
-            throw new \InvalidArgumentException(sprintf('There is no "%s" scope.', $scopeName));
+            throw new \InvalidArgumentException($scopeName ? sprintf('There is no "%s" scope.', $scopeName) : 'There are no scopes registered');
         }
 
         $this->scopes[$scopeName]->set($id, $service);

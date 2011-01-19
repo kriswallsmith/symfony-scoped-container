@@ -689,7 +689,7 @@ class ContainerBuilder extends Container implements TaggedContainerInterface
         $this->removeDefinition($id);
 
         if (!$scopeName = $definition->getScope()) {
-            $definition->setScope($scopeName = key($this->levels));
+            $definition->setScope($scopeName = $this->defaultScope);
         }
 
         if (!isset($this->factories[$scopeName])) {
