@@ -524,11 +524,6 @@ EOF;
         $levels = $this->container->getLevels();
         $factories = $this->container->getFactories();
 
-        $diff = array_diff_key($factories, $scopes);
-        if (0 < count($diff)) {
-            throw new \RuntimeException('Undefined scope(s): "'.implode('", "', $diff).'"');
-        }
-
         if (!count($scopes)) {
             return '';
         }
