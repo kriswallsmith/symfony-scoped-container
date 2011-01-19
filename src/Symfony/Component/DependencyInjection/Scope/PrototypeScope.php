@@ -3,6 +3,7 @@
 namespace Symfony\Component\DependencyInjection\Scope;
 
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\DependencyInjection\Factory\Factory;
 use Symfony\Component\DependencyInjection\Factory\FactoryInterface;
 
 /**
@@ -27,7 +28,7 @@ class PrototypeScope implements ScopeInterface
      */
     public function __construct(FactoryInterface $factory = null)
     {
-        $this->factory = $factory;
+        $this->factory = $factory ?: new Factory();
     }
 
     /** {@inheritDoc} */
