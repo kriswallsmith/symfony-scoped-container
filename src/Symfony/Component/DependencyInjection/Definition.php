@@ -22,7 +22,7 @@ class Definition
     protected $file;
     protected $factoryMethod;
     protected $factoryService;
-    protected $shared;
+    protected $scope;
     protected $arguments;
     protected $calls;
     protected $configurator;
@@ -40,7 +40,6 @@ class Definition
         $this->class = $class;
         $this->arguments = $arguments;
         $this->calls = array();
-        $this->shared = true;
         $this->tags = array();
         $this->public = true;
     }
@@ -312,27 +311,27 @@ class Definition
     }
 
     /**
-     * Sets if the service must be shared or not.
+     * Sets the service scope.
      *
-     * @param  Boolean $shared Whether the service must be shared or not
+     * @param  string $scope The scope name
      *
      * @return Definition The current instance
      */
-    public function setShared($shared)
+    public function setScope($scope)
     {
-        $this->shared = (Boolean) $shared;
+        $this->scope = $scope;
 
         return $this;
     }
 
     /**
-     * Returns true if the service must be shared.
+     * Returns the service scope.
      *
-     * @return Boolean true if the service is shared, false otherwise
+     * @return string The scope name
      */
-    public function isShared()
+    public function getScope()
     {
-        return $this->shared;
+        return $this->scope;
     }
 
     /**
