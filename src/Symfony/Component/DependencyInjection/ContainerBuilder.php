@@ -118,6 +118,26 @@ class ContainerBuilder extends Container implements TaggedContainerInterface
     }
 
     /**
+     * Returns an array of scopes.
+     *
+     * @return array An array of scope names and scopes
+     */
+    public function getScopes()
+    {
+        return $this->scopes;
+    }
+
+    /**
+     * Returns an array of scope levels.
+     *
+     * @return array An array of scope names and levels
+     */
+    public function getScopeLevels()
+    {
+        return $this->levels;
+    }
+
+    /**
      * Returns an array of factory builders.
      *
      * @return array An array of scope names and factories
